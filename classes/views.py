@@ -8,6 +8,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from .models import Subject, TrialLesson, WeeklyClass
 from .permissions import IsStudent, IsTrialLessonOpen
 from .serializers import (
+    AvailabilitySerializer,
     ScheduleSerializer,
     SubjectSerializer,
     TrialLessonSerializer,
@@ -66,3 +67,22 @@ class ScheduleView(APIView):
         }
         serializer = ScheduleSerializer(schedule, context={"request": request})
         return Response(serializer.data)
+
+
+class AvailabilityView(APIView):
+    permission_classes = [IsAuthenticated, IsStudent]
+
+    def get(self, request):
+        student = request.user.student
+        # Every student's bookings, as the clash checks see them; only their
+        # times and whether they are the student's own leave the server.
+        availability = {
+            "weekly_classes": WeeklyClass.objects.with_mine(student)
+            .in_week_order()
+            .only("day", "time"),
+            "trial_lessons": TrialLesson.objects.upcoming()
+            .with_mine(student)
+            .order_by("starts_at")
+            .only("starts_at"),
+        }
+        return Response(AvailabilitySerializer(availability).data)

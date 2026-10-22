@@ -18,7 +18,18 @@ from .timeslots import (
 )
 
 
-class WeeklyClassQuerySet(models.QuerySet):
+class BookingQuerySet(models.QuerySet):
+    def with_mine(self, student):
+        # Whether each booking is the student's own, without loading whose
+        # it is: the availability route returns every student's bookings.
+        return self.annotate(
+            mine=models.ExpressionWrapper(
+                models.Q(student=student), output_field=models.BooleanField()
+            )
+        )
+
+
+class WeeklyClassQuerySet(BookingQuerySet):
     def for_student(self, student):
         # One student's classes, with what their serializer reads loaded.
         return (
@@ -47,7 +58,7 @@ class WeeklyClassQuerySet(models.QuerySet):
         )
 
 
-class TrialLessonQuerySet(models.QuerySet):
+class TrialLessonQuerySet(BookingQuerySet):
     def for_student(self, student):
         # One student's lesson, with what its serializer reads loaded.
         return (

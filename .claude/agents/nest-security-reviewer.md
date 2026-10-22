@@ -18,7 +18,7 @@ You review security only. Naming, structure, Django idioms and project conventio
 
 - **Framework**: Django 6.1 + Django REST Framework on Python 3.14, backed by MySQL
 - **Backend only**: a separate Next.js frontend consumes the API — responses are JSON, there are no templates
-- **Apps**: `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule)
+- **Apps**: `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule, slots availability)
 - **User model**: custom `core.User`, referenced via `settings.AUTH_USER_MODEL` / `get_user_model()`
 - **Student profile**: `classes.Student` (one-to-one to the user, required `phone_number`), created by the `post_save` handler in `core/signals.py` when a user registers with a phone number. `phone_number` is write-only on registration and read-only on `/auth/users/me/`; a student must only ever see their own. Superusers and admin-created users have no Student
 - **Auth**: delegated to Djoser + SimpleJWT, mounted under `auth/`; the header prefix is `JWT`, not `Bearer`
@@ -60,8 +60,8 @@ Out of scope — do not report findings on these:
 
 ### 1. Authentication and permissions
 - Every new view or viewset declares `permission_classes`. Without it DRF falls back to `AllowAny`
-- Weekly classes, trial lessons and the schedule require `IsAuthenticated`
-- Weekly classes, trial lessons and the schedule also require `classes.permissions.IsStudent`, listed after `IsAuthenticated`: an anonymous request gets 401, a logged-in user without a Student gets 403
+- Weekly classes, trial lessons, the schedule and availability require `IsAuthenticated`
+- Weekly classes, trial lessons, the schedule and availability also require `classes.permissions.IsStudent`, listed after `IsAuthenticated`: an anonymous request gets 401, a logged-in user without a Student gets 403
 - Subjects use the access level the spec states; do not assume
 - No view overrides `authentication_classes` in a way that bypasses JWT
 
@@ -70,6 +70,7 @@ Out of scope — do not report findings on these:
 - The owner is set from the request (`serializer.save(user=self.request.user)` in `perform_create`), never taken from the request body. A weekly class and a trial lesson are owned by a Student: `serializer.save(student=self.request.user.student)`, and their querysets filter on that student
 - Requesting another student's booking by id returns 404 on retrieve, update and delete
 - The schedule returns only the logged-in student's data: the student is always `request.user.student`, never an id from the path, the query string or the body, and the view has no write method
+- Availability (`/availability/`) reads every student's bookings by design, but returns only `day`, `time`, `starts_at` and `mine`: its serializers list those fields by hand, and no id, student, user, subject, level, duration or completed flag reaches the response. `mine` compares with `request.user.student`; the route takes no id from the path, the query string or the body, and the view has no write method
 - Timeslot clash checks are the deliberate exception: they must query every user's bookings. Their error messages must not reveal who holds the slot or any detail of that booking
 
 ### 3. Serializer exposure and mass assignment

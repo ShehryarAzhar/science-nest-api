@@ -1,9 +1,7 @@
-import datetime
-
 from django.apps import apps
 
 from .constants import LEVEL_NOT_IN_SUBJECT_MESSAGE, TIMESLOT_TAKEN_MESSAGE
-from .timeslots import DayOfWeek
+from .timeslots import utc_slot
 
 # The models call these from clean(), so this module cannot import them: the
 # clash checks look their model up in the app registry instead.
@@ -22,9 +20,8 @@ def weekly_class_clash_error(starts_at):
     # TrialLesson.clean() and the serializer both ask here. Returns the
     # message, or None when the slot is free.
     WeeklyClass = apps.get_model("classes", "WeeklyClass")
-    starts_at = starts_at.astimezone(datetime.UTC)
-    day = DayOfWeek.values[starts_at.weekday()]
-    if WeeklyClass.objects.filter(day=day, time=starts_at.time()).exists():
+    day, time = utc_slot(starts_at)
+    if WeeklyClass.objects.filter(day=day, time=time).exists():
         return TIMESLOT_TAKEN_MESSAGE
     return None
 

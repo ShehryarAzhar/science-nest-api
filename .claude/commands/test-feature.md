@@ -1,6 +1,6 @@
 ---
 description: Writes and runs tests for a specific Science Nest API feature. Pass the feature name as argument e.g. /test-feature trial-lessons
-argument-hint: subjects | weekly-classes | trial-lessons | schedule | users
+argument-hint: subjects | weekly-classes | trial-lessons | schedule | slots-availability | users
 allowed-tools: Bash(uv run pytest:*)
 ---
 
@@ -10,7 +10,7 @@ in $ARGUMENTS.
 If no argument is provided, stop immediately and say:
 "Please provide a feature name. Usage: /test-feature
 <feature> e.g. /test-feature trial-lessons. Features:
-subjects, weekly-classes, trial-lessons, schedule, users"
+subjects, weekly-classes, trial-lessons, schedule, slots-availability, users"
 
 Look the feature up in this table:
 
@@ -21,11 +21,12 @@ Look the feature up in this table:
 | `weekly-classes` | `.claude/specs/03-weekly-classes.md` | Product requirements 3 (Weekly class scheduling) | `/classes/` | `classes` | `classes/tests/test_weekly_classes.py` |
 | `trial-lessons` | `.claude/specs/04-trial-lessons.md` | Product requirements 4 (Trial lessons) | `/trial-lessons/` | `classes` | `classes/tests/test_trial_lessons.py` |
 | `schedule` | `.claude/specs/05-schedule.md` | Product requirements 5 (My schedule) | `/schedule/` | `classes` | `classes/tests/test_schedule.py` |
+| `slots-availability` | `.claude/specs/06-slots-availability.md` | Product requirements 6 (Slots availability) | `/availability/` | `classes` | `classes/tests/test_availability.py` |
 
 If $ARGUMENTS is not one of these features, stop
 immediately and say:
 "Unknown feature '$ARGUMENTS'. Features: subjects,
-weekly-classes, trial-lessons, schedule, users"
+weekly-classes, trial-lessons, schedule, slots-availability, users"
 
 If the feature's routes are still marked Stub in the
 "Implemented vs Stub Routes" section of `CLAUDE.md`,

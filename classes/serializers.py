@@ -18,6 +18,7 @@ from .rules import (
     trial_lesson_clash_error,
     weekly_class_clash_error,
 )
+from .timeslots import DayOfWeek, utc_slot
 from .validators import validate_full_hour
 
 
@@ -213,3 +214,36 @@ class ScheduleSerializer(serializers.Serializer):
     weekly_cost = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+
+
+class TakenWeeklySlotSerializer(serializers.Serializer):
+    # Any student's weekly class: its time only, never whose it is.
+    day = serializers.ChoiceField(choices=DayOfWeek.choices, read_only=True)
+    time = serializers.TimeField(read_only=True)
+    mine = serializers.BooleanField(read_only=True)
+
+
+class TakenTrialSlotSerializer(serializers.Serializer):
+    # Any student's upcoming trial lesson: its time only.
+    starts_at = serializers.DateTimeField(read_only=True)
+    day = serializers.ChoiceField(choices=DayOfWeek.choices, read_only=True)
+    time = serializers.TimeField(read_only=True)
+    mine = serializers.BooleanField(read_only=True)
+
+    def to_representation(self, instance):
+        # The weekday + hour the lesson blocks for weekly classes, in UTC,
+        # from the same helper as the clash rule.
+        day, time = utc_slot(instance.starts_at)
+        return super().to_representation(
+            {
+                "starts_at": instance.starts_at,
+                "day": day,
+                "time": time,
+                "mine": instance.mine,
+            }
+        )
+
+
+class AvailabilitySerializer(serializers.Serializer):
+    weekly_classes = TakenWeeklySlotSerializer(many=True, read_only=True)
+    trial_lessons = TakenTrialSlotSerializer(many=True, read_only=True)

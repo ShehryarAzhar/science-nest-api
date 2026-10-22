@@ -26,19 +26,19 @@ You may read source files for **structure only**: model and field names, URL pat
 - **Dependencies**: managed with `uv`; test tools already installed are `pytest`, `pytest-django`, and `model-bakery`
 - **Test runner**: `uv run pytest`, `uv run pytest <app>/tests/`, or `uv run pytest <app>/tests/test_<name>.py`
 - **Database**: tests need a running MySQL server; pytest-django creates a `test_<DB_NAME>` database
-- **Apps**: `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule)
+- **Apps**: `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule, slots availability)
 - **User model**: custom `core.User` — always obtain it with `get_user_model()`, never import `django.contrib.auth.models.User`
 - **Student profile**: `classes.Student` (one-to-one to the user, required `phone_number`) is created only when a user registers through `POST /auth/users/` with a `phone_number`. `baker.make(get_user_model())` does not create one — add `baker.make(Student, user=user)` when a test needs it
 - **Auth**: Djoser + SimpleJWT with the `JWT` header prefix. Tests skip the token flow and use `force_authenticate`
 - **Password reset**: `POST /auth/users/reset_password/` and `POST /auth/users/reset_password_confirm/` are public. Read the reset link's `uid` and `token` from the email in `django.core.mail.outbox`. The first route is limited to 5 requests per hour per IP and counts in Django's cache, so clear the cache (`django.core.cache.cache.clear()`) before each test that calls it
 - **Permissions**: no default permission class is set, so every protected view must declare its own — always test the anonymous case
 - **Students only**: the API has no teacher or admin endpoints; that work happens in the Django admin
-- **URLs**: mounted without an app prefix — `/subjects/`, `/classes/`, `/trial-lessons/`, `/schedule/`, `/auth/...`
+- **URLs**: mounted without an app prefix — `/subjects/`, `/classes/`, `/trial-lessons/`, `/schedule/`, `/availability/`, `/auth/...`
 
 ## Test File Conventions
 - Each app keeps its tests in its own package: `<app>/tests/__init__.py` plus `test_*.py` modules
 - When creating an app's `tests/` package, delete the `<app>/tests.py` stub that `startapp` generated — it clashes with the package
-- Name files `test_<resource>.py` (e.g., `test_subjects.py`, `test_weekly_classes.py`, `test_trial_lessons.py`, `test_schedule.py`, `test_users.py`)
+- Name files `test_<resource>.py` (e.g., `test_subjects.py`, `test_weekly_classes.py`, `test_trial_lessons.py`, `test_schedule.py`, `test_availability.py`, `test_users.py`)
 - Group tests in one class per action, each marked `@pytest.mark.django_db`: `TestCreateWeeklyClass`, `TestListWeeklyClasses`, `TestRetrieveTrialLesson`, `TestUpdateTrialLesson`, `TestDeleteTrialLesson`
 - Name tests `test_if_<condition>_returns_<status>` (e.g., `test_if_user_is_anonymous_returns_401`, `test_if_timeslot_is_taken_returns_400`)
 - Structure each test as arrange, act, assert, separated by blank lines
@@ -151,6 +151,17 @@ Feature-specific rules from the product requirements (skip any that the feature'
   - a student with no classes has an empty `weekly_classes` and a total of zero
   - `weekly_classes` is ordered Monday to Sunday, then by time
   - prices are read live: after a subject's price changes, the schedule shows the new price and total
+- **Slots availability**:
+  - `GET /availability/` returns exactly `weekly_classes` and `trial_lessons`; it is read-only, so `POST`, `PUT`, `PATCH` and `DELETE` return 405
+  - anonymous is 401; a logged-in user without a Student is 403
+  - it lists *every* student's bookings, unlike the other booking routes; with no bookings anywhere both lists are empty
+  - a `weekly_classes` item has exactly `day`, `time` and `mine`; a `trial_lessons` item has exactly `starts_at`, `day`, `time` and `mine`. No id, student, user, subject, level, duration or completed flag appears anywhere in the response
+  - `mine` is `true` on the requesting student's own bookings and `false` on another student's; the same booking reads differently for its owner and for another student
+  - only upcoming trial lessons are listed: one whose `starts_at` has passed is left out (the student's own included); a completed one whose `starts_at` is still ahead is listed
+  - a trial lesson's `day` and `time` are the weekday and time of its `starts_at` in UTC, including when that weekday differs from the weekday in Asia/Karachi (e.g. Monday 21:00 UTC is `monday`, `21:00:00`)
+  - `weekly_classes` is ordered Monday to Sunday, then by time; `trial_lessons` by `starts_at`, earliest first
+  - the number of queries does not grow with the number of bookings
+  - the booking routes still reject a slot the route lists as taken, with the same error as before
 
 ## Code Quality Rules
 - Each test must be fully independent — no shared mutable state, no reliance on another test's side effects

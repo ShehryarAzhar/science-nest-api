@@ -19,7 +19,7 @@ You review quality only. Permissions, authorization, data exposure and rule bypa
 - **Framework**: Django 6.1 + Django REST Framework on Python 3.14, backed by MySQL
 - **Backend only**: a separate Next.js frontend consumes the API — responses are JSON, there are no templates or server-rendered pages
 - **Dependencies**: managed with `uv` (`pyproject.toml` / `uv.lock`)
-- **Apps**: `config/` (settings, root URLconf), `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule)
+- **Apps**: `config/` (settings, root URLconf), `core/` (custom user and auth), `classes/` (subjects, weekly classes, trial lessons, schedule, slots availability)
 - **User model**: custom `core.User`, referenced via `settings.AUTH_USER_MODEL` / `get_user_model()`
 - **Student profile**: `classes.Student` (one-to-one to the user, required `phone_number`), created by the `post_save` handler in `core/signals.py` when a user registers with a phone number. Superusers and admin-created users have no Student, so code must not assume `user.student` exists
 - **Auth**: delegated to Djoser + SimpleJWT; there are no hand-written auth views. Password reset is Djoser's `reset_password` / `reset_password_confirm`, configured only through settings (`DJOSER`, `SIMPLE_JWT["CHECK_REVOKE_TOKEN"]`, `PASSWORD_RESET_TIMEOUT`) plus `core.throttling.PasswordResetThrottle`; email is configured through `MAILERS`
@@ -66,7 +66,7 @@ Out of scope — do not report findings on these:
 
 ### 2. Project conventions (`CLAUDE.md`)
 - `ModelViewSet` registered on a DRF router; subjects use `ReadOnlyModelViewSet`
-- An endpoint that does not map onto a model's CRUD (my schedule) uses whatever fits best: `APIView`, a generic view, or a viewset `@action`
+- An endpoint that does not map onto a model's CRUD (my schedule, availability) uses whatever fits best: `APIView`, a generic view, or a viewset `@action`
 - Money is stored in `DecimalField`, never `FloatField`, and is not converted to `float` in calculations
 - The user is referenced via `settings.AUTH_USER_MODEL` in models and `get_user_model()` elsewhere, never `django.contrib.auth.models.User`
 - Every new model is registered in `admin.py`
@@ -85,6 +85,7 @@ Out of scope — do not report findings on these:
 - The weekly total is computed without one query per class
 - A weekly class is priced in one place, `WeeklyClass.price`; the schedule's `price` field and `weekly_cost` both use it, and the total is summed as `Decimal` from the same loaded classes the response lists
 - One student's bookings are loaded through `for_student()` on `WeeklyClassQuerySet` / `TrialLessonQuerySet`; the filter, `select_related` and `prefetch_related` chain is not repeated per view
+- Availability reuses the shared helpers instead of rewriting them: a trial lesson's UTC weekday + hour comes from `utc_slot()` in `classes/timeslots.py` (shared with `weekly_class_clash_error`), upcoming is `TrialLessonQuerySet.upcoming()`, the week order is `in_week_order()`, and `mine` comes from `with_mine()`
 - Time handling uses `django.utils.timezone`, not naive `datetime.now()`
 - The database and the API are UTC; the Django admin shows and accepts Asia/Karachi (`ADMIN_TIME_ZONE`, `core.middleware.AdminTimezoneMiddleware`). A weekly class's `day` + `time` is converted for the admin only by `slot_in_zone()` / `slot_to_utc()` in `classes/timeslots.py`; the conversion is not rewritten elsewhere, no offset is hard-coded and no offset is assumed to be a whole hour
 - Nothing relies on MySQL's timezone tables (no `date_hierarchy`, no datetime `__date` / `__hour` lookup under a non-UTC timezone)
