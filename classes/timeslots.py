@@ -30,10 +30,12 @@ MINUTES_PER_DAY = 24 * 60
 MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY
 
 
-def utc_offset_minutes(tz):
-    # The zone's own offset right now, so nothing hard-codes it.
-    offset = datetime.datetime.now(tz).utcoffset()
-    return int(offset.total_seconds() // 60)
+def utc_offset_minutes(tz, at=None):
+    # The zone's own offset at the moment at (an aware datetime; now by
+    # default), so nothing hard-codes it. Exact minutes: offsets such as
+    # +5:30 and +5:45 are not whole hours.
+    moment = datetime.datetime.now(tz) if at is None else at.astimezone(tz)
+    return moment.utcoffset() // datetime.timedelta(minutes=1)
 
 
 def _shift_slot(day, time, minutes):
@@ -50,14 +52,19 @@ def _shift_slot(day, time, minutes):
     return DayOfWeek.values[day_index], time.replace(hour=hour, minute=minute)
 
 
-def slot_in_zone(day, time, tz):
+# A weekly slot has no date, so it is converted at the offset tz has at the
+# moment at (now by default). In a zone with daylight saving the same UTC
+# slot reads an hour apart either side of the change; that is by design.
+
+
+def slot_in_zone(day, time, tz, at=None):
     """A weekly class's UTC day and time as they read in tz."""
-    return _shift_slot(day, time, utc_offset_minutes(tz))
+    return _shift_slot(day, time, utc_offset_minutes(tz, at))
 
 
-def slot_to_utc(day, time, tz):
+def slot_to_utc(day, time, tz, at=None):
     """A day and time given in tz as the UTC day and time that are stored."""
-    return _shift_slot(day, time, -utc_offset_minutes(tz))
+    return _shift_slot(day, time, -utc_offset_minutes(tz, at))
 
 
 def day_rank():

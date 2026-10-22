@@ -30,15 +30,16 @@ class WeeklyClassQuerySet(models.QuerySet):
     def in_week_order(self):
         return self.order_by(day_rank(), "time")
 
-    def with_week_minute(self, tz):
-        # The minute of the week each class starts on as it reads in tz
-        # (Monday 00:00 is 0): slot_in_zone() in SQL, to order and filter by.
+    def with_week_minute(self, tz, at=None):
+        # The minute of the week each class starts on as it reads in tz at
+        # the moment at (Monday 00:00 is 0): slot_in_zone() in SQL, to order
+        # and filter by.
         return self.annotate(
             week_minute=Mod(
                 day_rank() * MINUTES_PER_DAY
                 + ExtractHour("time") * 60
                 + ExtractMinute("time")
-                + utc_offset_minutes(tz)
+                + utc_offset_minutes(tz, at)
                 + MINUTES_PER_WEEK,
                 MINUTES_PER_WEEK,
                 output_field=models.IntegerField(),
