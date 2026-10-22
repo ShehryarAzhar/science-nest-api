@@ -305,6 +305,46 @@ class TestCreateTrialLesson:
         assert response.json()["starts_at"] == iso(starts_at)
         assert TrialLesson.objects.get().starts_at == starts_at
 
+    @pytest.mark.parametrize(
+        "offset", [{"hours": 5, "minutes": 30}, {"hours": 5, "minutes": 45}]
+    )
+    def test_if_offset_is_not_whole_hours_and_utc_is_full_hour_returns_201(
+        self, create_lesson, student_user, offset
+    ):
+        # Asia/Kolkata and Asia/Kathmandu: the lesson reads at :30 or :45
+        # locally, which is fine as long as it is a full hour in UTC.
+        subject = make_subject()
+        starts_at = future_hour()
+        zone = datetime.timezone(datetime.timedelta(**offset))
+        local = starts_at.astimezone(zone).isoformat()
+
+        response = create_lesson(
+            {"subject": subject.id, "level": "o_level", "starts_at": local}
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["starts_at"] == iso(starts_at)
+        assert TrialLesson.objects.get().starts_at == starts_at
+
+    @pytest.mark.parametrize(
+        "offset", [{"hours": 5, "minutes": 30}, {"hours": 5, "minutes": 45}]
+    )
+    def test_if_local_full_hour_is_not_full_hour_in_utc_returns_400(
+        self, create_lesson, student_user, offset
+    ):
+        # 08:00 at +5:30 is 02:30 UTC: the full-hour rule is judged in UTC.
+        subject = make_subject()
+        zone = datetime.timezone(datetime.timedelta(**offset))
+        local = future_hour().astimezone(zone).replace(minute=0).isoformat()
+
+        response = create_lesson(
+            {"subject": subject.id, "level": "o_level", "starts_at": local}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "starts_at" in response.data
+        assert not TrialLesson.objects.exists()
+
     @pytest.mark.parametrize("missing", ["subject", "level", "starts_at"])
     def test_if_field_is_missing_returns_400(
         self, create_lesson, student_user, missing
