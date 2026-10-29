@@ -67,6 +67,12 @@ def slot_to_utc(day, time, tz, at=None):
     return _shift_slot(day, time, -utc_offset_minutes(tz, at))
 
 
+def utc_slot(starts_at):
+    """The UTC weekday and time a date-time falls on, as a weekly slot."""
+    starts_at = starts_at.astimezone(datetime.UTC)
+    return DayOfWeek.values[starts_at.weekday()], starts_at.time()
+
+
 def day_rank():
     # The day codes do not sort in week order, so rank them.
     return models.Case(

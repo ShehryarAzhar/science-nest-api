@@ -1,6 +1,6 @@
 ---
 description: Create a spec file and feature branch for a Science Nest API feature. Pass a feature name e.g. /create-spec trial-lessons
-argument-hint: users | subjects | weekly-classes | trial-lessons | schedule | <number> <feature name>
+argument-hint: users | subjects | weekly-classes | trial-lessons | schedule | slots-availability | <number> <feature name>
 allowed-tools: Read, Write, Glob, Grep, Bash(git:*)
 ---
 
@@ -26,6 +26,7 @@ from this table:
 | `weekly-classes` | 03 | Weekly Class Scheduling | Product requirements 3 | `/classes/` |
 | `trial-lessons` | 04 | Trial Lessons | Product requirements 4 | `/trial-lessons/` |
 | `schedule` | 05 | My Schedule | Product requirements 5 | `/schedule/` |
+| `slots-availability` | 06 | Slots Availability | Product requirements 6 | `/availability/` |
 
 Otherwise expect `<number> <feature name>` (e.g. `6 class
 cancellation`) and extract:

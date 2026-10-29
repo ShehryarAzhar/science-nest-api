@@ -12,7 +12,7 @@ Django 6.1 + Django REST Framework API on Python 3.14, backed by MySQL. Dependen
 
 ## Product requirements
 
-All five requirements are built (see Implemented vs Stub Routes). The numbering 1–5 matches the spec numbers (requirement 2 is `.claude/specs/02-subjects.md`) and is referenced by the slash commands ("Product requirements 4"), so keep it stable.
+All six requirements are built (see Implemented vs Stub Routes). The numbering 1–6 matches the spec numbers (requirement 2 is `.claude/specs/02-subjects.md`) and is referenced by the slash commands ("Product requirements 4"), so keep it stable.
 
 1. **Users and student profile** — a user registers with username, email, password, first and last name and a phone number, and logs in with a JWT. Auth is delegated to Djoser + SimpleJWT; Architecture > Auth describes how it is built.
    - Email is unique.
@@ -71,11 +71,25 @@ All five requirements are built (see Implemented vs Stub Routes). The numbering 
    - `trial_lesson` has exactly the fields it has on `/trial-lessons/` and no price. It is shown even when it is completed or its date and time have passed.
    - Prices are read from the subject on every request; no price or total is stored. When an admin changes a subject's price, the schedule shows the new price and total from then on.
    - A logged-in user without a Student gets 403 on `/schedule/`.
+6. **Slots availability** — returns every taken slot, in UTC, so the frontend can grey them out in its booking pickers instead of the student finding out only after submitting.
+   - `GET /availability/` is the only route; it is read-only. Logged-in students only: anonymous is 401, a logged-in user without a Student gets 403.
+   - The response has two lists, grouped by kind of booking, not by picker, because the two kinds block different things: `weekly_classes` and `trial_lessons`.
+     - `weekly_classes` holds every student's weekly class as `day`, `time` and `mine`, ordered Monday to Sunday, then by time.
+     - `trial_lessons` holds every student's upcoming trial lesson as `starts_at`, `day`, `time` and `mine`, earliest first. `day` and `time` are the weekday and time of `starts_at` in UTC. Upcoming means its start time has not been reached, whether or not it is marked completed; a trial lesson whose start time has passed blocks nothing and is left out, the student's own included.
+     - With no bookings anywhere both lists are empty. `day` is the code, `time` is `"HH:MM:SS"` as on `/classes/`, `starts_at` is ISO 8601 in UTC as on `/trial-lessons/`.
+     - e.g. `{"weekly_classes": [{"day": "tuesday", "time": "14:00:00", "mine": false}], "trial_lessons": [{"starts_at": "2026-10-27T09:00:00Z", "day": "tuesday", "time": "09:00:00", "mine": true}]}`
+   - It returns only times. It never returns who booked a slot, a booking id, the subject, the level, the duration, the completed flag or any other booking or student data.
+   - `mine` is `true` on the logged-in student's own bookings and `false` on everyone else's. It says only that the slot is the student's, not which booking holds it.
+   - How the frontend uses it:
+     - Weekly class picker: grey out every `weekly_classes` day + time and the `day` + `time` of every `trial_lessons` item. When editing weekly class X, only X's own day + time stays selectable; the student's other classes and their own upcoming trial lesson still block it, as the server rejects them.
+     - Trial lesson picker: grey out every date that falls on a `weekly_classes` day + time, and every exact `starts_at` in `trial_lessons` (a trial lesson does not block the same weekday + hour on other dates). When editing their trial lesson, its own `starts_at` stays selectable.
+   - It does not replace the server-side checks: a slot can be taken between loading the picker and submitting, so `/classes/` and `/trial-lessons/` keep their clash validation and errors as they are.
+   - There are no tutor working hours: every hour of every day is bookable, and the route returns no working hours.
 
 ## API conventions
 
 - The API serves students only. Everything teacher- or admin-side (managing subjects, viewing and editing all students' classes and trial lessons, managing users) is done in the Django admin site, so register every model in `admin.py` and do not build teacher-facing endpoints.
-- Scope every booking queryset to `request.user`; a student must never see or modify another student's classes or trial lessons. Timeslot clash checks are the exception: they must look at every user's bookings.
+- Scope every booking queryset to `request.user`; a student must never see or modify another student's classes or trial lessons. Timeslot clash checks are the exception: they must look at every user's bookings. `/availability/` is the other exception: it reads every student's bookings but returns only their `day`, `time`, `starts_at` and `mine`.
 - Prefer `ModelViewSet` registered on a DRF router. When an endpoint does not map onto a model's CRUD (e.g. my schedule, which aggregates and totals), use whatever fits best (`APIView`, a generic view, or a viewset `@action`).
 - Enforce booking rules (full hour, no timeslot clash) on the server in serializers/models, backed by a database constraint where possible; do not rely on the frontend.
 - Every date and time in the database and the API is UTC. The server stores, compares and returns UTC; the frontend converts to and from the student's local time. Do not change `TIME_ZONE` or `USE_TZ`: DRF reads them.
@@ -98,6 +112,7 @@ Each feature goes through the same four steps, driven by the slash commands in `
 | `weekly-classes` | 3 | `.claude/specs/03-weekly-classes.md` | `/classes/` | `classes/tests/test_weekly_classes.py` |
 | `trial-lessons` | 4 | `.claude/specs/04-trial-lessons.md` | `/trial-lessons/` | `classes/tests/test_trial_lessons.py` |
 | `schedule` | 5 | `.claude/specs/05-schedule.md` | `/schedule/` | `classes/tests/test_schedule.py` |
+| `slots-availability` | 6 | `.claude/specs/06-slots-availability.md` | `/availability/` | `classes/tests/test_availability.py` |
 
 - The test runner and both reviewers are read-only and never fix anything. An implementation bug is fixed in the main session; a test bug goes back to `nest-test-writer`. Never weaken, skip or delete a test to make it pass.
 - `/test-feature` and `/code-review-feature` refuse to run while the feature's routes are still marked Stub.
@@ -152,7 +167,7 @@ Tests are normally written by `nest-test-writer` through `/test-feature`. Tests 
 
 - `config/` — the Django project (settings, root URLconf, WSGI/ASGI). There is a single settings module; no per-environment split. `config/urls.py` also sets the Django admin's site header, site title and index title ("Science Nest administration", "Science Nest admin", "Site administration").
 - `core/` — custom user model, auth customisation, the registration signal that creates a user's `Student` profile, `core/throttling.py`, which rate-limits the password reset email route (see Password reset), and `core/middleware.py`, which runs the Django admin in Asia/Karachi (see Admin timezone).
-- `classes/` — domain app for the `Student` profile, subjects, weekly classes, trial lessons and the schedule; its models are `Student`, `Level`, `Subject`, `WeeklyClass` and `TrialLesson`. `classes/models.py` holds only the models; the code they share sits beside it: `constants.py` (error messages and constraint names), `validators.py`, `timeslots.py` (`DayOfWeek` and the weekly slot helpers), `querysets.py` and `rules.py`. A subject's levels are a many-to-many to `Level`, whose four rows are created by the data migration `classes/migrations/0005_seed_levels.py`. `SubjectViewSet` sets `lookup_field = "slug"`, so a subject is retrieved by its slug; `subject_slug_validator` in `validators.py` holds the slug's format, which is stricter than `SlugField`'s own. `classes/permissions.py` holds `IsStudent`, which booking views list after `IsAuthenticated` so a user without a Student gets 403, and `IsTrialLessonOpen`, the object-level permission that answers 403 when a locked trial lesson is edited or deleted. The rules that compare a weekly class with a trial lesson (`weekly_class_clash_error`, `trial_lesson_clash_error`) live in `classes/rules.py`, shared by the models' `clean()` and the serializers. Its viewsets are registered on the `SimpleRouter` in `classes/urls.py`, which `config/urls.py` mounts at the root (no app prefix). The schedule is not a viewset: `ScheduleView` is an `APIView` on a plain `path()` beside the router's routes in the same file. `WeeklyClass.price` is the one place a class is priced by its duration; the schedule's `price` and `weekly_cost` both come from it. `for_student(student)` on `WeeklyClassQuerySet` and `TrialLessonQuerySet` is the scoped queryset (one student's bookings, with subject and levels loaded) that the viewsets and the schedule share.
+- `classes/` — domain app for the `Student` profile, subjects, weekly classes, trial lessons and the schedule; its models are `Student`, `Level`, `Subject`, `WeeklyClass` and `TrialLesson`. `classes/models.py` holds only the models; the code they share sits beside it: `constants.py` (error messages and constraint names), `validators.py`, `timeslots.py` (`DayOfWeek` and the weekly slot helpers), `querysets.py` and `rules.py`. A subject's levels are a many-to-many to `Level`, whose four rows are created by the data migration `classes/migrations/0005_seed_levels.py`. `SubjectViewSet` sets `lookup_field = "slug"`, so a subject is retrieved by its slug; `subject_slug_validator` in `validators.py` holds the slug's format, which is stricter than `SlugField`'s own. `classes/permissions.py` holds `IsStudent`, which booking views list after `IsAuthenticated` so a user without a Student gets 403, and `IsTrialLessonOpen`, the object-level permission that answers 403 when a locked trial lesson is edited or deleted. The rules that compare a weekly class with a trial lesson (`weekly_class_clash_error`, `trial_lesson_clash_error`) live in `classes/rules.py`, shared by the models' `clean()` and the serializers. Its viewsets are registered on the `SimpleRouter` in `classes/urls.py`, which `config/urls.py` mounts at the root (no app prefix). The schedule and availability are not viewsets: `ScheduleView` and `AvailabilityView` are `APIView`s on plain `path()`s beside the router's routes in the same file. `AvailabilityView` reads every student's weekly classes and upcoming trial lessons; `with_mine(student)`, shared by both querysets, annotates whether each one is the student's own, and `utc_slot(starts_at)` in `timeslots.py` gives a trial lesson's UTC weekday and time, the same helper `weekly_class_clash_error` uses. `WeeklyClass.price` is the one place a class is priced by its duration; the schedule's `price` and `weekly_cost` both come from it. `for_student(student)` on `WeeklyClassQuerySet` and `TrialLessonQuerySet` is the scoped queryset (one student's bookings, with subject and levels loaded) that the viewsets and the schedule share.
 - `.claude/` — Claude Code slash commands (`commands/`), subagents (`agents/`) and feature specs (`specs/`, created by `/create-spec`). See Claude Code tooling.
 
 ### Auth
@@ -287,3 +302,9 @@ Read-only by design; subjects are managed in the Django admin. Both routes are p
 | Method | Path | Status |
 | --- | --- | --- |
 | GET | `/schedule/` | Implemented |
+
+### Slots availability
+
+| Method | Path | Status |
+| --- | --- | --- |
+| GET | `/availability/` | Implemented |

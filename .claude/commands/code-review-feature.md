@@ -1,6 +1,6 @@
 ---
 description: Runs parallel security and quality code review for a specific Science Nest API feature. Pass the feature name as argument e.g. /code-review-feature trial-lessons
-argument-hint: subjects | weekly-classes | trial-lessons | schedule | users
+argument-hint: subjects | weekly-classes | trial-lessons | schedule | slots-availability | users
 allowed-tools: Bash(git diff:*), Bash(git status:*)
 ---
 
@@ -11,7 +11,7 @@ If no argument is provided, stop immediately and say:
 "Please provide a feature name. Usage:
 /code-review-feature <feature> e.g. /code-review-feature
 trial-lessons. Features: subjects, weekly-classes,
-trial-lessons, schedule, users"
+trial-lessons, schedule, slots-availability, users"
 
 Look the feature up in this table:
 
@@ -22,11 +22,12 @@ Look the feature up in this table:
 | `weekly-classes` | `.claude/specs/03-weekly-classes.md` | Product requirements 3 (Weekly class scheduling) | `/classes/` | `classes` |
 | `trial-lessons` | `.claude/specs/04-trial-lessons.md` | Product requirements 4 (Trial lessons) | `/trial-lessons/` | `classes` |
 | `schedule` | `.claude/specs/05-schedule.md` | Product requirements 5 (My schedule) | `/schedule/` | `classes` |
+| `slots-availability` | `.claude/specs/06-slots-availability.md` | Product requirements 6 (Slots availability) | `/availability/` | `classes` |
 
 If $ARGUMENTS is not one of these features, stop
 immediately and say:
 "Unknown feature '$ARGUMENTS'. Features: subjects,
-weekly-classes, trial-lessons, schedule, users"
+weekly-classes, trial-lessons, schedule, slots-availability, users"
 
 In the steps below, `<app>` and `<spec file>` mean the
 values from the feature's row in the table.
