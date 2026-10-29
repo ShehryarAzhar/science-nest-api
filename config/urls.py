@@ -23,6 +23,7 @@ admin.site.site_title = "Science Nest admin"
 admin.site.index_title = "Site administration"
 
 urlpatterns = [
+    path("", include("core.urls")),
     path("admin/", admin.site.urls),
     path("auth/", include("djoser.urls")),
     path("auth/", include("djoser.urls.jwt")),
