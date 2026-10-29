@@ -10,6 +10,7 @@ dependencies = [
     "djoser>=2.3.4",
     "mysqlclient>=2.3.0",
     "python-dotenv>=1.2.4",
+    "whitenoise>=6.12.0",
 ]
 
 [dependency-groups]
