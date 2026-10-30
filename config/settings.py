@@ -24,14 +24,30 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+
+def env_list(name, default=""):
+    """Read a comma-separated environment variable into a list."""
+    return [
+        item.strip() for item in os.getenv(name, default).split(",") if item.strip()
+    ]
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-q+)su2pmvy*wzw#x9_cjrjin^_bj&+p=!wgky8#f0^@%n6k&92"
+# The fallback is for local development only. Render gets a new random key.
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "django-insecure-q+)su2pmvy*wzw#x9_cjrjin^_bj&+p=!wgky8#f0^@%n6k&92"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Off unless DEBUG=True is set (put DEBUG=True in your local .env).
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# Render sets this to your service's domain, e.g. science-nest-api.onrender.com
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Application definition
 
@@ -62,10 +78,11 @@ MIDDLEWARE = [
     "core.middleware.AdminTimezoneMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+# On Render, set CORS_ALLOWED_ORIGINS to your frontend URL(s), comma-separated.
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+)
 
 ROOT_URLCONF = "config.urls"
 
@@ -95,6 +112,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": os.getenv("DB_NAME", "science-nest"),
         "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "3306"),
         "USER": os.getenv("DB_USER", "root"),
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
     }
@@ -142,6 +160,37 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
+# WhiteNoise serves the collected files, compressed and cached.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Production security
+# Render handles HTTPS in front of the app and forwards plain HTTP to it.
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# Logging: send errors and tracebacks to stdout so they show in Render's logs.
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
