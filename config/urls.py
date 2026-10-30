@@ -18,11 +18,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from core.views import health
+
 admin.site.site_header = "Science Nest administration"
 admin.site.site_title = "Science Nest admin"
 admin.site.index_title = "Site administration"
 
 urlpatterns = [
+    path("api/health/", health),
     path("", include("core.urls")),
     path("admin/", admin.site.urls),
     path("auth/", include("djoser.urls")),
