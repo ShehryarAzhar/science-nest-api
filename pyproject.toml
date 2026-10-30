@@ -8,6 +8,7 @@ dependencies = [
     "django-rest-framework>=0.1.0",
     "djangorestframework-simplejwt>=5.5.1",
     "djoser>=2.3.4",
+    "gunicorn>=26.2.0",
     "mysqlclient>=2.3.0",
     "python-dotenv>=1.2.4",
     "whitenoise>=6.12.0",
